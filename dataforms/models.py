@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from fields import SeparatedValuesField
 from app_settings import FIELD_TYPE_CHOICES, BINDING_OPERATOR_CHOICES, \
     BINDING_ACTION_CHOICES
-    
+
 
 class Collection(models.Model):
     """
@@ -23,12 +23,11 @@ class Collection(models.Model):
         return self.slug
 
     class Meta:
-        verbose_name = 'Form Collection'
-        verbose_name_plural = 'Form Collections'
+        verbose_name = 'Collection'
 
 
 class CollectionDataForm(models.Model):
-    """ 
+    """
     Model bridge for Collection and DataForm
     """
 
@@ -40,8 +39,8 @@ class CollectionDataForm(models.Model):
     class Meta:
         unique_together = ('collection', 'data_form', 'section')
         ordering = ['order', ]
-        verbose_name = 'Collection Mapping'
-        verbose_name_plural = 'Collection Mappings'
+        verbose_name = 'Form Order'
+        verbose_name_plural = 'Form Ordering'
 
     def __unicode__(self):
         return u'%s in %s (%s)' % (self.collection, self.data_form, self.section)
@@ -56,7 +55,7 @@ class Section(models.Model):
 
     def __unicode__(self):
         return self.slug
-    
+
     class Meta:
         ordering = ['title', ]
 
@@ -75,15 +74,14 @@ class DataForm(models.Model):
 
     def __unicode__(self):
         return self.slug
-    
+
     class Meta:
         ordering = ['title', ]
         verbose_name = 'Form'
-        verbose_name_plural = 'Forms'
 
 
 class DataFormField(models.Model):
-    """ 
+    """
     Model bridge for DataForm and Field
     """
 
@@ -94,13 +92,13 @@ class DataFormField(models.Model):
     class Meta:
         unique_together = ('data_form', 'field')
         ordering = ['order', ]
-        verbose_name = 'Field Mapping'
-        verbose_name_plural = 'Field Mappings'
+        verbose_name = 'Field Order'
+        verbose_name_plural = 'Field Ordering'
 
     def __unicode__(self):
         return u'%s in %s' % (self.data_form, self.field)
 
-        
+
 class Field(models.Model):
     """
     Model that holds fields
@@ -113,16 +111,17 @@ class Field(models.Model):
     slug = models.SlugField(verbose_name=_('slug'), max_length=255, unique=True, validators=[reserved_delimiter])
     help_text = models.TextField(verbose_name=_('field help text'), blank=True)
     initial = models.TextField(verbose_name=_('initial value of the field'), blank=True)
-    classes = models.CharField(verbose_name=_('additional widget classes'), 
+    classes = models.CharField(verbose_name=_('additional widget classes'),
                                       help_text="A comma separated string of class names.", blank=True, max_length=255)
     arguments = models.CharField(verbose_name=_('additional field arguments'),
         help_text="A JSON dictionary of keyword arguments.", blank=True, max_length=255)
     required = models.BooleanField(verbose_name=_('field is required'), default=False)
     visible = models.BooleanField(verbose_name=_('field is visible'), default=True)
+    #placeholder_value = models.TextField(verbose_name=_('placeholder value'), blank=True)
 
     def __unicode__(self):
         return self.slug
-    
+
     class Meta:
         ordering = ['slug', ]
 
@@ -135,7 +134,7 @@ class Binding(models.Model):
     operator = models.CharField(max_length=255, choices=BINDING_OPERATOR_CHOICES)
     value = models.CharField(max_length=255, blank=True,
         help_text="Required if a Operator is equal to 'checked'.")
-    
+
     true_field = SeparatedValuesField(blank=True)
     true_choice = SeparatedValuesField(blank=True)
 
@@ -145,9 +144,9 @@ class Binding(models.Model):
     action = models.CharField(max_length=255, choices=BINDING_ACTION_CHOICES, default='show-hide')
     function = models.CharField(max_length=255, blank=True,
         help_text="Required if Action is equal to 'Function'.")
-    
+
     additional_rules = CommaSeparatedIntegerField(max_length=200, blank=True)
-    
+
     def clean(self):
         # Field requires a Operator and Value
         if self.operator != 'checked' and not self.value:
@@ -155,7 +154,7 @@ class Binding(models.Model):
 
         if self.field_choice and self.operator != 'checked':
             raise ValidationError("Operator must be equal to 'checked of Field Choice is selected.")
-        
+
         # A field or choice is required
         if (not self.true_field and not self.true_choice
             and not self.false_field and not self.field_choice):
@@ -164,41 +163,40 @@ class Binding(models.Model):
         # If action is function, then a function is needed
         if self.action == 'function' and not self.function:
             raise ValidationError('A function is required if action is function.')
-        
+
         # If additional rules are applied, then the rules cannot be the same as current record
         if self.additional_rules and unicode(self.id) in self.additional_rules:
             raise ValidationError('You cannot apply the current rule to additional rules.')
-        
-    
+
+
     def __unicode__(self):
         return '%s' % self.pk
- 
+
     class Meta:
-        verbose_name = 'Field Binding'
-        verbose_name_plural = 'Field Bindings'
-    
-    
+        verbose_name = 'Binding'
+
+
 class FieldChoiceManager(models.Manager):
 
     def get_fieldchoice_data(self):
-    
+
         sql = '''
-            SELECT fc.id, fc.choice_id, fc.field_id, f.slug AS field_slug, 
+            SELECT fc.id, fc.choice_id, fc.field_id, f.slug AS field_slug,
                 d.slug AS data_form_slug, c.value AS choice_value
-            FROM dataforms_fieldchoice fc 
+            FROM dataforms_fieldchoice fc
             INNER JOIN dataforms_field f ON f.id = fc.field_id
             INNER JOIN dataforms_choice c ON c.id = fc.choice_id
             INNER JOIN dataforms_dataformfield df ON df.field_id = f.id
             INNER JOIN dataforms_dataform d ON d.id = df.data_form_id
-            
+
             ORDER BY d.slug
         '''
-        
+
         return self.raw(sql, [])
 
 
 class FieldChoice(models.Model):
-    """ 
+    """
     Model bridge for Field and Choice
     """
 
@@ -212,8 +210,8 @@ class FieldChoice(models.Model):
     class Meta:
         unique_together = ('field', 'choice')
         ordering = ['field', 'order']
-        verbose_name = 'Choice Mapping'
-        verbose_name_plural = 'Choice Mappings'
+        verbose_name = 'Choice Order'
+        verbose_name_plural = 'Choice Ordering'
 
     def __unicode__(self):
         return u'%s (%s)' % (self.field, self.choice)
@@ -228,13 +226,12 @@ class Choice(models.Model):
 
     def __unicode__(self):
         return unicode(self.title)
-    
+
     class Meta:
         ordering = ['title']
         # FIXME: This fails on MySQL using InnoDB due to MySQL bug http://bugs.mysql.com/bug.php?id=4541
         #unique_together = ('title', 'value',)
-        verbose_name = 'Field Choice'
-        verbose_name_plural = 'Field Choices'
+        verbose_name = 'Choice'
 
 
 class Submission(models.Model):
@@ -252,25 +249,25 @@ class Submission(models.Model):
 class AnswerManager(models.Manager):
 
     def get_answer_data(self, submission_id, field_slugs=None, data_form_id=None):
-        
+
         # When you need many to many, use raw()....its awesome!
         sql = '''
-            SELECT a.*, f.field_type, f.slug AS field_slug, 
+            SELECT a.*, f.field_type, f.slug AS field_slug,
                 d.slug AS data_form_slug, c.value as choice_value, ac.choice_id
-                     FROM dataforms_answer a 
+                     FROM dataforms_answer a
                      LEFT JOIN dataforms_answerchoice ac ON a.id = ac.answer_id
                      LEFT JOIN dataforms_choice c ON ac.choice_id = c.id
                      INNER JOIN dataforms_field f ON a.field_id = f.id
-                     INNER JOIN dataforms_dataform d ON a.data_form_id = d.id 
+                     INNER JOIN dataforms_dataform d ON a.data_form_id = d.id
             WHERE a.submission_id = %s
         '''
-        
+
         params = [submission_id]
-        
+
         if data_form_id:
             sql += 'AND a.data_form_id = %s '
             params.append(data_form_id)
-            
+
         if field_slugs:
             sql += 'AND f.slug IN (%s)' % ','.join(["%s"]*len(field_slugs))
             params += field_slugs
@@ -298,7 +295,7 @@ class Answer(models.Model):
 class AnswerChoice(models.Model):
     choice = models.ForeignKey('Choice')
     answer = models.ForeignKey('Answer')
-    
+
     def __unicode__(self):
         return self.choice.title
 
