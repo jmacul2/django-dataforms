@@ -16,7 +16,7 @@ from django.utils.safestring import mark_safe
 from models import DataForm, Collection, Field, FieldChoice, Choice, Answer, \
     AnswerChoice, Submission, CollectionDataForm, Section, Binding
 from app_settings import FIELD_MAPPINGS, SINGLE_CHOICE_FIELDS, MULTI_CHOICE_FIELDS, \
-    CHOICE_FIELDS, UPLOAD_FIELDS, FIELD_DELIMITER, STATIC_CHOICE_FIELDS, FORM_MEDIA, \
+    CHOICE_FIELDS, UPLOAD_FIELDS, FIELD_DELIMITER, FORM_MEDIA, DYNAMIC_CHOICE_FIELDS, \
     VALIDATION_MODULE, CHOICES_MODULE
 from utils.file import handle_upload, DataFormFile
 from utils.sql import update_many, insert_many
@@ -168,6 +168,10 @@ class BaseDataForm(forms.BaseForm):
             answers = (Answer.objects.select_related('submission', 'data_from', 'field')
                        .filter(data_form__slug=self.slug, submission=self.submission))
 
+        # Get All possible choices from form models dict
+        #choices = Choice.objects.all()
+        choices = Choice.objects.filter(fieldchoice__field__answer__submission=self.submission).distinct()
+
         # Setup answer list so we can do a bulk update
         answer_objects = []
 
@@ -177,8 +181,19 @@ class BaseDataForm(forms.BaseForm):
             # Delete the choices so we can re-insert
             AnswerChoice.objects.filter(answer=answer).delete()
 
-            answer_obj = self._prepare_answer(answer)
+            answer_obj, choice_relations = self._prepare_answer(answer, choices)
             answer_objects.append(answer_obj)
+
+            # If there are choices, do mass insert on them for each answer.
+            if choice_relations:
+                answer_choices = []
+                for choice in choice_relations:
+                    answer_choice = AnswerChoice()
+                    answer_choice.answer = answer
+                    answer_choice.choice = choice
+                    answer_choices.append(answer_choice)
+
+                insert_many(answer_choices)
 
         # Update the answers
         update_many(answer_objects, fields=['value'])
@@ -196,20 +211,32 @@ class BaseDataForm(forms.BaseForm):
             self.fields[field].widget.attrs['disabled'] = 'disabled'
 
 
-    #def _prepare_answer(self, answer, choices):
-    def _prepare_answer(self, answer):
+    def _prepare_answer(self, answer, choices):
 
         field = answer.field
         key = _field_for_form(field, self.slug)
+        choice_relations = []
 
         # Because Choices are m2m relations, we need to do this after the save.
-        if field.field_type in CHOICE_FIELDS or field.field_type in STATIC_CHOICE_FIELDS:
+        if field.field_type in CHOICE_FIELDS and field.field_type not in DYNAMIC_CHOICE_FIELDS:
+
+            answer_choices = []
 
             # If string, wrap as a list because the for-loop below assumes a list
             if isinstance(self.cleaned_data[key], str) or isinstance(self.cleaned_data[key], unicode):
                 self.cleaned_data[key] = [self.cleaned_data[key]]
 
-            answer.value = ','.join(self.cleaned_data[key])
+            # Add the selected choices
+            for choice_answer in self.cleaned_data[key]:
+                cur_choice = filter(lambda c: c.value == choice_answer, choices)
+                if cur_choice:
+                    cur_choice = cur_choice[0]
+                    answer_choices.append(unicode(cur_choice.value))
+                    choice_relations.append(cur_choice)
+
+            # Save the string representation of the choice answers in to
+            # answer.value
+            answer.value = ','.join(answer_choices)
 
         else:
 
@@ -242,7 +269,7 @@ class BaseDataForm(forms.BaseForm):
 
             answer.value = content
 
-        return answer
+        return answer, choice_relations
 
 
     def _remove_extraneous_fields(self):
@@ -280,6 +307,7 @@ class BaseCollection(object):
     def __init__(self, collection, forms, sections, current_section):
         self.collection = collection
         self.submission = None
+        # TODO: Why did I str these?
         self.title = str(collection.title)
         self.description = str(collection.description)
         self.slug = str(collection.slug)
@@ -767,14 +795,16 @@ def _create_form(form, title=None, description=None):
             choices = ()
 
             # We add a separator for select boxes
-            if row['field_type'] == 'Select':
+            if row['field_type'] in ['Select', 'DynamicSelect']:
                 choices += ('', '--------'),
 
-            choices_func = getattr(choices_module, row['slug'].replace('-', '_'), None)
+            # Pull From Dynamic Choices if assigned
+            if row['field_type'] in DYNAMIC_CHOICE_FIELDS:
+                choices_func = getattr(choices_module, row['slug'].replace('-', '_'), None)
 
-            # Populate our choices tuple
-            if choices_func:
-                choices += choices_func()
+                # Populate our choices tuple
+                if choices_func:
+                    choices += choices_func()
             else:
                 choices += choices_dict[row['id']]
             field_kwargs['choices'] = choices
