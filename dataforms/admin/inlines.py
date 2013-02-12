@@ -5,7 +5,7 @@ from django.contrib import admin
 class CollectionInline(admin.TabularInline):
     model = CollectionDataForm
     extra = 0
-    
+
 
 class ChoiceInline(admin.TabularInline):
     model = FieldChoice
@@ -15,4 +15,4 @@ class ChoiceInline(admin.TabularInline):
 class FieldInline(admin.TabularInline):
     model = DataFormField
     extra = 1
-    
+
