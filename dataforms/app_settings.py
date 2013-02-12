@@ -9,10 +9,11 @@ FIELD_MAPPINGS = {}
 if hasattr(settings, 'DATAFORMS_FIELD_MAPPINGS'):
 	FIELD_MAPPINGS = settings.DATAFORMS_FIELD_MAPPINGS
 
-FIELD_MAPPINGS.update( {
+FIELD_MAPPINGS.update({
 	'TextInput' : { 'class': 'django.forms.CharField', 'widget': 'django.forms.TextInput' },
 	'Textarea' : { 'class': 'django.forms.CharField', 'widget': 'django.forms.Textarea' },
 	'Select' : { 'class': 'django.forms.ChoiceField', 'widget': 'django.forms.Select' },
+	'DynamicSelect' : { 'class': 'django.forms.ChoiceField', 'widget': 'django.forms.Select' },
 	'SelectMultiple' : { 'class': 'django.forms.MultipleChoiceField', 'widget': 'django.forms.SelectMultiple' },
 	'RadioSelect' : { 'class': 'django.forms.ChoiceField', 'widget': 'django.forms.RadioSelect' },
 	'Password' : { 'class': 'django.forms.CharField', 'widget': 'django.forms.PasswordInput', 'widget_kwargs' : { 'render_value' : True } },
@@ -30,7 +31,7 @@ FIELD_MAPPINGS.update( {
 
 	# FIXME: Remove After testing....
 	'USStateField' : { 'class': 'django.contrib.localflavor.us.forms.USStateField', 'widget' : 'django.forms.TextInput' },
-} )
+})
 
 # Path for file uploads (don't forget trailing slash)
 FILE_UPLOAD_PATH = getattr(settings, "DATAFORMS_FILE_UPLOAD_PATH", "uploads/")
@@ -41,10 +42,10 @@ UPLOAD_FIELDS = getattr(settings, "DATAFORMS_UPLOAD_FIELDS", ()) + ('FileInput',
 BOOLEAN_FIELDS = getattr(settings, "DATAFORMS_BOOLEAN_FIELDS", ()) + ('CheckboxInput',)
 SINGLE_CHOICE_FIELDS = getattr(settings, "DATAFORMS_SINGLE_CHOICE_FIELDS", ()) + ('Select', 'RadioSelect')
 MULTI_CHOICE_FIELDS = getattr(settings, "DATAFORMS_MULTI_CHOICE_FIELDS", ()) + ('SelectMultiple', 'CheckboxSelectMultiple')
+# These fields are get their choices from a dynamic function located in the CHOICES_MODULE
+DYNAMIC_CHOICE_FIELDS = getattr(settings, "DATAFORMS_DYNAMIC_CHOICE_FIELDS", ('DynamicSelect',))
 # These fields tie into the Choice Model
-CHOICE_FIELDS = (SINGLE_CHOICE_FIELDS + MULTI_CHOICE_FIELDS)
-# These fields are saved as Comma Delimited Strings (usefull for numbers)
-STATIC_CHOICE_FIELDS = getattr(settings, "DATAFORMS_STATIC_CHOICE_FIELDS", ())
+CHOICE_FIELDS = (SINGLE_CHOICE_FIELDS + MULTI_CHOICE_FIELDS + DYNAMIC_CHOICE_FIELDS)
 
 FIELD_DELIMITER = getattr(settings, "DATAFORMS_FIELD_DELIMITER", "__")
 
@@ -52,7 +53,7 @@ VALIDATION_MODULE = getattr(settings, "DATAFORMS_VALIDATION_MODULE", "validation
 
 CHOICES_MODULE = getattr(settings, "DATAFORMS_CHOICES_MODULE", "choices")
 
-FIELD_TYPE_CHOICES = tuple([(field,field) for field in FIELD_MAPPINGS])
+FIELD_TYPE_CHOICES = tuple([(field,field) for field in sorted(FIELD_MAPPINGS)])
 
 REMOTE_JQUERY_JS = (
 	'https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js',
